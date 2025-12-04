@@ -547,7 +547,7 @@ def generate_dot(schema: Dict, layout: str = "neato", show_all_attrs: bool = Tru
     dot_lines.append(f'    ranksep=2.0;')
     dot_lines.append(f'    sep="+25,25";')
     dot_lines.append(f'')
-    dot_lines.append(f'    node [fontname="Arial", fontsize=11, margin=0.15];')
+    dot_lines.append(f'    node [fontname="Arial", fontsize=11, margin=0.15, style=filled, fillcolor=white];')
     dot_lines.append(f'    edge [fontname="Arial", fontsize=9, labeldistance=1.5, labelangle=45];')
     dot_lines.append(f'')
 
@@ -563,10 +563,13 @@ def generate_dot(schema: Dict, layout: str = "neato", show_all_attrs: bool = Tru
             columns = entity.columns
 
         # Entity node
-        peripheries = 2 if is_weak else 1
-        fillcolor = 'lightyellow' if is_weak else 'lightblue'
-        penwidth = 2 if is_weak else 1.5
-        dot_lines.append(f'    {entity_name} [shape=box, style=filled, fillcolor={fillcolor}, peripheries={peripheries}, penwidth={penwidth}, label="{entity_name}", fontsize=13, fontname="Arial Bold"];')
+        peripheries = 1
+        penwidth = 1.5
+        dot_lines.append(
+            f'    {entity_name} [shape=box, peripheries={peripheries}, penwidth={penwidth}, '
+            f'width=2.0, height=0.8, fixedsize=true, '
+            f'label="{entity_name}", fontsize=13, fontname="Arial Bold"];'
+        )
 
         # Attribute nodes
         for col in columns:
@@ -586,11 +589,11 @@ def generate_dot(schema: Dict, layout: str = "neato", show_all_attrs: bool = Tru
             attr_id = f'{entity_name}_{col_name}'
 
             if is_pk:
-                # Primary key: green ellipse with bold text
-                dot_lines.append(f'    {attr_id} [shape=ellipse, style=filled, fillcolor=lightgreen, label="{col_name}", fontname="Arial Bold"];')
+                # Primary key: white ellipse with bold text
+                dot_lines.append(f'    {attr_id} [shape=ellipse, width=1.8, height=0.6, fixedsize=true, label="{col_name}", fontname="Arial Bold"];')
             else:
-                # Regular attribute: white ellipse
-                dot_lines.append(f'    {attr_id} [shape=ellipse, style=filled, fillcolor=white, label="{col_name}"];')
+                # Regular attribute: white ellipse with single border
+                dot_lines.append(f'    {attr_id} [shape=ellipse, width=1.8, height=0.6, fixedsize=true, label="{col_name}"];')
 
             # Connect attribute to entity
             dot_lines.append(f'    {entity_name} -- {attr_id};')
@@ -621,7 +624,11 @@ def generate_dot(schema: Dict, layout: str = "neato", show_all_attrs: bool = Tru
         # Relationship node
         peripheries = 2 if rel_type == "3-way" else 1
         penwidth = 2 if rel_type == "3-way" else 1.5
-        dot_lines.append(f'    {rel_id} [shape=diamond, style=filled, fillcolor=pink, peripheries={peripheries}, penwidth={penwidth}, label="{rel_name}", fontsize=11];')
+        dot_lines.append(
+            f'    {rel_id} [shape=diamond, peripheries={peripheries}, penwidth={penwidth}, '
+            f'width=2.2, height=0.8, fixedsize=true, '
+            f'label="{rel_name}", fontsize=11];'
+        )
 
         # Connect entities to relationship
         for entity_name in rel_entities:
@@ -644,7 +651,7 @@ def generate_dot(schema: Dict, layout: str = "neato", show_all_attrs: bool = Tru
                 attr_name = attr
 
             attr_id = f'{rel_id}_{attr_name}'
-            dot_lines.append(f'    {attr_id} [shape=ellipse, style=filled, fillcolor=white, label="{attr_name}"];')
+            dot_lines.append(f'    {attr_id} [shape=ellipse, width=1.8, height=0.6, fixedsize=true, label="{attr_name}"];')
             dot_lines.append(f'    {rel_id} -- {attr_id};')
 
         dot_lines.append(f'')
@@ -756,28 +763,36 @@ def main():
 
     # Sidebar configuration
     with st.sidebar:
-        st.header("⚙️ Configuration")
+        st.header("配置")
 
         # Layout engine
-        layout_engine = st.selectbox(
-            "Graph Layout",
-            ["neato", "fdp", "dot", "circo", "twopi"],
+        layout_options = {
+            "自动布局（推荐）": "neato",
+            "自动布局（紧凑）": "fdp",
+            "分层布局（树状）": "dot",
+            "圆环布局": "circo",
+            "放射布局": "twopi",
+        }
+        layout_label = st.selectbox(
+            "图表布局",
+            list(layout_options.keys()),
             index=0,
-            help="neato/fdp are suitable for ER diagrams; dot is suitable for hierarchical structures"
+            help="控制 ER 图节点的大致排布方式"
         )
+        layout_engine = layout_options[layout_label]
 
         # Attribute display
         show_all_attrs = st.checkbox(
-            "Show All Attributes",
+            "显示所有属性",
             value=True,
-            help="Uncheck to show only primary keys and foreign keys"
+            help="取消勾选则只显示主键和外键"
         )
 
         # Manual join tables
         manual_joins_input = st.text_area(
-            "Manual Join Tables",
-            placeholder="table1, table2, table3",
-            help="Force mark as join tables (comma-separated)",
+            "手动指定中间表",
+            placeholder="例如：user_role, a_b, ...",
+            help="强制将指定表识别为连接表（逗号分隔）",
             height=80
         )
 
@@ -786,19 +801,19 @@ def main():
             manual_joins = [t.strip() for t in manual_joins_input.split(',') if t.strip()]
 
         # Example SQL
-        st.subheader("📚 Example Schemas")
+        st.subheader("示例 SQL")
 
         col_a, col_b, col_c = st.columns(3)
 
-        if col_a.button("Simple", use_container_width=True):
+        if col_a.button("简单示例", use_container_width=True):
             st.session_state.sql_input = EXAMPLE_SIMPLE
             st.rerun()
 
-        if col_b.button("Medium", use_container_width=True):
+        if col_b.button("中等示例", use_container_width=True):
             st.session_state.sql_input = EXAMPLE_MEDIUM
             st.rerun()
 
-        if col_c.button("Complex", use_container_width=True):
+        if col_c.button("复杂示例", use_container_width=True):
             st.session_state.sql_input = EXAMPLE_COMPLEX
             st.rerun()
 
